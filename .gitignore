@@ -2,3 +2,4 @@ node_modules
 .ado-dash-cache.json
 .env*
 !.env.example
+.cursor/
