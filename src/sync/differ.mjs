@@ -40,6 +40,22 @@ export function diffStates(oldState, newState, notificationKeys) {
 				})
 			}
 		} else {
+			const oldStatus = oldPr.status ?? ''
+			const newStatus = pr.status ?? ''
+			if (oldStatus !== newStatus) {
+				changedPrIds.add(id)
+				const cacheKey = `pr-status:${id}:${newStatus}`
+				if (!hasKey(cacheKey)) {
+					events.push({
+						type: 'pr-status',
+						entityId: id,
+						message: `PR #${id} ${newStatus}: ${pr.title ?? ''}`,
+						notifyType: newStatus === 'completed' ? 'done' : 'status',
+						cacheKey,
+					})
+				}
+			}
+
 			const oldActive = oldPr.threadCounts?.active ?? 0
 			const newActive = pr.threadCounts?.active ?? 0
 			if (newActive !== oldActive) {
@@ -185,6 +201,22 @@ export function diffStates(oldState, newState, notificationKeys) {
 						cacheKey,
 					})
 				}
+			}
+		}
+	}
+
+	for (const name of oldBranchSet) {
+		if (!newBranchSet.has(name)) {
+			changedBranchNames.add(name)
+			const cacheKey = `branch-deleted:${name}`
+			if (!hasKey(cacheKey)) {
+				events.push({
+					type: 'branch-deleted',
+					entityId: name,
+					message: `Branch deleted: ${name}`,
+					notifyType: 'status',
+					cacheKey,
+				})
 			}
 		}
 	}
