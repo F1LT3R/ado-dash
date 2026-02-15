@@ -20,6 +20,7 @@ export function diffStates(oldState, newState, notificationKeys) {
 	const oldWiMap = new Map(oldWi.map((w) => [w.id, w]))
 	const newWiMap = new Map(newWi.map((w) => [w.id, w]))
 	const oldBranchSet = new Set((oldBranches ?? []).map((b) => b.name ?? b))
+	const oldBranchMap = new Map((oldBranches ?? []).map((b) => [b.name ?? b, b]))
 	const newBranchSet = new Set((newBranches ?? []).map((b) => b.name ?? b))
 
 	const hasKey = (key) => notificationKeys && notificationKeys.has(key)
@@ -49,6 +50,22 @@ export function diffStates(oldState, newState, notificationKeys) {
 						type: 'pr-comment',
 						entityId: id,
 						message: `New comment on PR #${id}: ${pr.title ?? ''}`,
+						notifyType: 'status',
+						cacheKey,
+					})
+				}
+			}
+
+			const oldTitle = oldPr.title ?? ''
+			const newTitle = pr.title ?? ''
+			if (newTitle !== oldTitle) {
+				changedPrIds.add(id)
+				const cacheKey = `pr-title:${id}:${newTitle}`
+				if (!hasKey(cacheKey)) {
+					events.push({
+						type: 'pr-title',
+						entityId: id,
+						message: `PR #${id} renamed: ${newTitle}`,
 						notifyType: 'status',
 						cacheKey,
 					})
@@ -119,6 +136,22 @@ export function diffStates(oldState, newState, notificationKeys) {
 					})
 				}
 			}
+
+			const oldWiTitle = oldWiItem.title ?? ''
+			const newWiTitle = wi.title ?? ''
+			if (newWiTitle !== oldWiTitle) {
+				changedWiIds.add(id)
+				const cacheKey = `wi-title:${id}:${newWiTitle}`
+				if (!hasKey(cacheKey)) {
+					events.push({
+						type: 'wi-title',
+						entityId: id,
+						message: `WI #${id} renamed: ${newWiTitle}`,
+						notifyType: 'status',
+						cacheKey,
+					})
+				}
+			}
 		}
 	}
 
@@ -126,6 +159,33 @@ export function diffStates(oldState, newState, notificationKeys) {
 		const name = b.name ?? b
 		if (!oldBranchSet.has(name)) {
 			changedBranchNames.add(name)
+			const cacheKey = `new-branch:${name}`
+			if (!hasKey(cacheKey)) {
+				events.push({
+					type: 'new-branch',
+					entityId: name,
+					message: `New branch: ${name}`,
+					notifyType: 'status',
+					cacheKey,
+				})
+			}
+		} else {
+			const oldBranch = oldBranchMap.get(name)
+			const oldHash = oldBranch?.commitHash ?? ''
+			const newHash = b.commitHash ?? ''
+			if (oldHash && newHash && oldHash !== newHash) {
+				changedBranchNames.add(name)
+				const cacheKey = `branch-updated:${name}:${newHash}`
+				if (!hasKey(cacheKey)) {
+					events.push({
+						type: 'branch-updated',
+						entityId: name,
+						message: `Branch ${name} updated (${oldHash} → ${newHash})`,
+						notifyType: 'status',
+						cacheKey,
+					})
+				}
+			}
 		}
 	}
 

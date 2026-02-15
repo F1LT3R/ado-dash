@@ -5,6 +5,24 @@ export function createNotifier(config) {
 	let processing = false
 	let silent = false
 
+	function log(msg) {
+		if (!config.debug) return
+		process.stderr.write(`[notifier] ${msg}\n`)
+	}
+
+	async function sendNotification(notifyType, message) {
+		const params = new URLSearchParams({
+			type: notifyType,
+			message,
+			workspaceDir: 'Azure DevOps',
+			app: 'Azure DevOps',
+		})
+		const url = `${config.notifyServerUrl}/notify/agent?${params}`
+		log(`fetching: ${url}`)
+		const res = await fetch(url)
+		log(`response: ${res.status}`)
+	}
+
 	async function processQueue() {
 		if (queue.length === 0) {
 			processing = false
@@ -13,25 +31,38 @@ export function createNotifier(config) {
 		const event = queue.shift()
 		if (!silent && config.notifyServerUrl) {
 			try {
-				const params = new URLSearchParams({
-					type: event.notifyType,
-					message: event.message,
-					workspaceDir: process.cwd(),
-					app: 'ado-dash',
-				})
-				const url = `${config.notifyServerUrl}/notify/agent?${params}`
-				await fetch(url)
+				await sendNotification(event.notifyType, event.message)
 			} catch (err) {
-				process.stderr.write(`[notifier] fetch failed: ${err.message}\n`)
+				log(`fetch failed: ${err.message}`)
 			}
+		} else if (!config.notifyServerUrl) {
+			log(`skipped (no NOTIFY_SERVER_URL): ${event.message}`)
+		} else {
+			log(`skipped (silent mode): ${event.message}`)
 		}
 		await processQueue()
 	}
 
+	async function startup() {
+		if (!config.notifyServerUrl) {
+			log('WARNING: NOTIFY_SERVER_URL is not set — notifications disabled')
+			return
+		}
+		log(`server url: ${config.notifyServerUrl}`)
+		try {
+			await sendNotification('status', 'Azure DevOps Dashboard started')
+		} catch (err) {
+			log(`startup notification failed: ${err.message}`)
+		}
+	}
+
 	return {
+		startup,
+
 		enqueue(events) {
 			const newKeys = []
 			for (const e of events) {
+				log(`enqueue: [${e.type}] ${e.message}`)
 				if (queue.length >= QUEUE_CAP) {
 					queue.shift()
 				}

@@ -1,3 +1,4 @@
+import './loadEnv.mjs'
 import { exec } from 'node:child_process'
 import config from './config.mjs'
 import { createCache } from './sync/cache.mjs'
@@ -76,6 +77,9 @@ const cache = createCache(config.cacheFile)
 const notifier = createNotifier(config)
 const renderer = createRenderer()
 const dashboard = createDashboard(renderer)
+
+// Fire a startup notification to confirm the notify pipeline works
+notifier.startup()
 
 // Load cached state on startup
 const cached = cache.load()

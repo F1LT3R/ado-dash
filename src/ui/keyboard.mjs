@@ -139,9 +139,9 @@ export function createKeyboardHandler(callbacks) {
 				callbacks.onToggleAllPRs?.()
 			} else if (c === 's') {
 				callbacks.onToggleSilent?.()
-			} else if (c === 'r') {
-				callbacks.onRefresh?.()
-			} else if (c === 'y') {
+		} else if (c === 'r' || c === 'u') {
+			callbacks.onRefresh?.()
+		} else if (c === 'y') {
 				callbacks.onClearHighlights?.()
 			} else if (c === 'q') {
 				callbacks.onQuit?.()

@@ -10,4 +10,5 @@ export default {
 	// Current user identity — used to highlight "mine" items.
 	// Set via env or leave blank for auto-detection from first API response.
 	currentUser: process.env.ADO_USER || "",
+	debug: process.argv.includes('--debug'),
 }
