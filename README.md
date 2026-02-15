@@ -14,6 +14,29 @@
 
 Azure DevOps Dashboard is a Node.js CLI tool that polls the Azure DevOps REST API and renders a rich, interactive terminal UI. It gives you a real-time view of your repository's pull requests, work items, and branches — with audio notifications when things change.
 
+```
+PRs
+─────────────────────────────────────────────────────────────────────────────
+▎🔀 PR #42  Jane D  Add user auth flow…       ⏳active   feature/auth…  ✅2  💬3  📋WI#18
+▎🔀 PR #39  Jane D  Fix session timeout…      ✅done     bugfix/sess…   ✅3  💬1  📋WI#25
+ 🔀 PR #41  Alex M  Update CI pipeline…       ⏳active   chore/ci-up…   ⏳1  💬0  —
+ 🔀 PR #38  Sam K   Refactor data layer…      📝draft    feature/ref…        💬5  📋WI#12
+Work Items
+─────────────────────────────────────────────────────────────────────────────
+▎📖 US #18  Implement login page…             Active   In Progress   💬3  🔀PR#42
+▎📋 Task #25  Fix token refresh bug…          Resolved Resolved      💬1  🔀PR#39
+ 🐛 Bug #30   Search returns stale…           Active   In Review     💬2
+ 🏗️ Feat #12  Data layer v2…                  New      Todo          💬0  🔀PR#38
+ 🎯 Epic #5   User Authentication             New      💬0
+Branches
+─────────────────────────────────────────────────────────────────────────────
+▎feature/auth-flow       Jane Doe      a1b2c3d  ↑3 ↓1
+▎bugfix/session-fix      Jane Doe      e4f5g6h  ↑1 ↓0
+ chore/ci-update         Alex Morgan   i7j8k9l  ↑2 ↓5
+ feature/refactor-data   Sam Kim       m0n1o2p  ↑6 ↓12
+Synced: 14:32:05  Next: 45s                                                 
+```
+
 ### Key Features
 
 - **Three-panel layout** — PRs, Work Items, and Branches displayed simultaneously with dynamic row allocation
