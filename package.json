@@ -1,0 +1,11 @@
+{
+	"name": "ado-dash",
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"start": "node src/index.mjs"
+	},
+	"dependencies": {
+		"chalk": "^5.4.0"
+	}
+}

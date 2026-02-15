@@ -1,0 +1,125 @@
+import chalk from 'chalk'
+
+const TYPE_EMOJI = {
+	'User Story': '📖',
+	'Task': '📋',
+	'Bug': '🐛',
+	'Feature': '🏗️',
+	'Epic': '🎯',
+	'Issue': '📌'
+}
+
+function getTypeEmoji(type) {
+	if (!type) return '❓'
+	const key = Object.keys(TYPE_EMOJI).find(k => type.toLowerCase().includes(k.toLowerCase()))
+	return TYPE_EMOJI[key] || '❓'
+}
+
+function getStateColor(state) {
+	if (!state) return chalk.white
+	const s = state.toLowerCase()
+	if (s.includes('new')) return chalk.blue
+	if (s.includes('active')) return chalk.yellow
+	if (s.includes('resolved')) return chalk.green
+	if (s.includes('closed')) return chalk.green.dim
+	return chalk.white
+}
+
+function getColumnColor(col) {
+	if (!col) return chalk.white
+	const c = col.toLowerCase()
+	if (c.includes('backlog')) return chalk.dim
+	if (c.includes('progress')) return chalk.white.bold
+	if (c.includes('done') || c.includes('closed') || c.includes('resolved')) return chalk.green
+	return chalk.white
+}
+
+function truncate(str, max) {
+	if (!str || max <= 0) return ''
+	return str.length <= max ? str : str.slice(0, max - 1) + '…'
+}
+
+export function isMyWI(wi, currentUser) {
+	if (!currentUser) return false
+	const u = currentUser.toLowerCase()
+	if ((wi.assignedTo || '').toLowerCase().includes(u)) return true
+	if ((wi.assignedToUniqueName || '').toLowerCase().includes(u)) return true
+	if ((wi.createdBy || '').toLowerCase().includes(u)) return true
+	if ((wi.createdByUniqueName || '').toLowerCase().includes(u)) return true
+	return false
+}
+
+export function formatWIPanel(workItems, rows, cols, changedIds = new Set(), currentUser = '', cursorIndex = -1) {
+	const lines = []
+	const entities = []
+	lines.push(chalk.bold.white('Work Items'))
+	lines.push(chalk.dim('─'.repeat(cols)))
+
+	const availableRows = Math.max(0, rows - 2)
+	if (availableRows <= 0 || !workItems || workItems.length === 0) {
+		while (lines.length < rows) lines.push('')
+		return { lines: lines.slice(0, rows), entities }
+	}
+
+	// Sort: mine first
+	const sorted = [...workItems]
+	if (currentUser) {
+		sorted.sort((a, b) => {
+			const aMine = isMyWI(a, currentUser) ? 0 : 1
+			const bMine = isMyWI(b, currentUser) ? 0 : 1
+			return aMine - bMine
+		})
+	}
+
+	const titleWidth = Math.max(10, Math.floor(cols * 0.3))
+	const showLinkedPrs = cols >= 50
+	const showComments = cols >= 40
+	const showBoardColumn = cols >= 30
+
+	for (let i = 0; i < availableRows && i < sorted.length; i++) {
+		const wi = sorted[i]
+		const id = wi.id
+		const mine = isMyWI(wi, currentUser)
+		const typeEmoji = getTypeEmoji(wi.type)
+		const title = truncate(wi.title || '', titleWidth)
+		const stateColor = getStateColor(wi.state)
+		const colColor = getColumnColor(wi.boardColumn)
+
+		let row = ''
+		row += `${typeEmoji} WI #${id}  `
+		row += truncate(title, titleWidth).padEnd(titleWidth)
+		row += '  '
+		row += stateColor(wi.state || '')
+		row += '  '
+
+		if (showBoardColumn && wi.boardColumn) {
+			row += colColor(truncate(wi.boardColumn, 15))
+			row += '  '
+		}
+		if (showComments) {
+			const count = wi.commentCount ?? 0
+			row += `💬${count}  `
+		}
+		if (showLinkedPrs && wi.linkedPrIds && wi.linkedPrIds.length > 0) {
+			row += `🔀PR#${wi.linkedPrIds[0]}`
+		}
+
+		let formatted = truncate(row, cols)
+
+		if (currentUser && !mine) {
+			formatted = chalk.dim(formatted)
+		}
+
+		if (cursorIndex === i) {
+			formatted = chalk.inverse(formatted)
+		}
+
+		entities.push({ type: 'wi', id, webUrl: wi.webUrl })
+		lines.push(formatted)
+	}
+
+	while (lines.length < rows) {
+		lines.push('')
+	}
+	return { lines: lines.slice(0, rows), entities }
+}
