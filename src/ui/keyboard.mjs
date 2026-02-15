@@ -97,7 +97,13 @@ export function createKeyboardHandler(callbacks) {
 					i++
 					continue
 				}
-				if (c === '\x7f' || c === '\x08') {
+				if (c === '\x03') {
+				exitSearchMode()
+				callbacks.onQuit?.()
+				i++
+				continue
+			}
+			if (c === '\x7f' || c === '\x08') {
 					searchBuffer = searchBuffer.slice(0, -1)
 					if (searchBuffer.length === 0) {
 						exitSearchMode()
