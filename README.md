@@ -87,13 +87,13 @@ source load-env.sh
 ```bash
 # Source your PAT, then start
 source ~/.secrets/ADO_PR_REVIEW_PAT
-node src/index.mjs
+node lib/index.mjs
 
 # Or use the helper script
 source load-env.sh && npm start
 
 # Enable debug logging
-node src/index.mjs --debug
+node lib/index.mjs --debug
 ```
 
 ## Keyboard Shortcuts
@@ -112,32 +112,93 @@ node src/index.mjs --debug
 | `0` | Reset to dynamic multi-panel layout |
 | `q` / `Ctrl+C` | Quit |
 
+## Icon Legend
+
+### Pull Requests
+
+| Icon | Meaning |
+|------|---------|
+| `🔀` | Pull request row |
+| `⏳` | Active status / waiting reviewer |
+| `✅` | Completed status / approved reviewer |
+| `❌` | Abandoned status / rejected reviewer |
+| `📝` | Draft status |
+| `🔄` | Reviewer approved with suggestions |
+| `💬` | Thread count (active comments) |
+| `📋` | Linked work item count |
+
+### Work Items
+
+| Icon | Meaning |
+|------|---------|
+| `📖` | User Story |
+| `📋` | Task |
+| `🐛` | Bug |
+| `🏗️` | Feature |
+| `🎯` | Epic |
+| `📌` | Issue |
+| `❓` | Unknown type |
+| `💬` | Comment count |
+| `🔀` | Linked PR |
+
+### Branches
+
+| Icon | Meaning |
+|------|---------|
+| `↑` | Commits ahead of default branch (green) |
+| `↓` | Commits behind default branch (red) |
+
+### Status Bar
+
+| Icon | Meaning |
+|------|---------|
+| `🔇` | Silent mode (notifications suppressed) |
+| `⚠` | Error message |
+
 ## Notifications
 
 The dashboard detects and notifies on the following changes:
 
+**Pull Requests:**
+
 | Event | Description |
 |-------|-------------|
 | New PR | A pull request appears that wasn't in the previous poll |
+| PR status change | Status transitions (active → abandoned, completed, etc.) |
 | PR title changed | A PR's title has been modified |
-| PR comment activity | Active thread count changes on a PR |
-| PR approved | A reviewer votes to approve |
-| PR rejected | A reviewer requests changes |
+| PR draft status | Draft ↔ published toggle |
+| Thread count change | Active, resolved, or closed thread counts change |
+| Reviewer added | A new reviewer is added to the PR |
+| Reviewer removed | A reviewer is removed from the PR |
+| Vote change | Any reviewer vote change (approve, reject, wait for author, suggestions) |
+| Work item linked | A work item is linked to the PR |
+| Work item unlinked | A work item is unlinked from the PR |
+
+**Work Items:**
+
+| Event | Description |
+|-------|-------------|
 | New work item | A work item appears that wasn't in the previous poll |
-| Work item state change | A work item moves to a different state |
-| Work item renamed | A work item's title has been modified |
+| State change | A work item moves to a different state (e.g., Active → Resolved) |
+| Title changed | A work item's title has been modified |
+
+**Branches:**
+
+| Event | Description |
+|-------|-------------|
 | New branch | A branch appears that didn't exist before |
 | Branch updated | A branch's commit hash changes (new push) |
+| Branch deleted | A branch that existed previously has been removed |
 
 Notifications are sent via HTTP to an [agent-notify](https://github.com/F1LT3R/agent-notify) server, which provides text-to-speech audio alerts. Set `NOTIFY_SERVER_URL` in your `.env` to enable.
 
 ## Architecture
 
 ```
-src/
+lib/
 ├── index.mjs              # Entry point, state management, keyboard wiring
 ├── loadEnv.mjs            # .env file loader (runs before imports)
-├── config.mjs             # Centralized configuration from environment
+├── config.mjs             # Centralized configuration from environment (icons, etc.)
 ├── api/
 │   ├── client.mjs         # fetch wrapper with auth, retry, rate-limit handling
 │   ├── prs.mjs            # PR fetcher with threads, votes, linked work items
