@@ -1,10 +1,13 @@
 const SEARCH_DEBOUNCE_MS = 200
+const ESC_TIMEOUT_MS = 50
 
 export function createKeyboardHandler(callbacks) {
 	let searchMode = false
 	let searchBuffer = ''
 	let searchDebounceTimer = null
 	let stdinRaw = false
+	let pendingBuf = ''
+	let escTimer = null
 
 	function clearDebounce() {
 		if (searchDebounceTimer) {
@@ -28,8 +31,33 @@ export function createKeyboardHandler(callbacks) {
 		callbacks.onSearchCancel?.()
 	}
 
-	function handleData(chunk) {
-		const str = String(chunk)
+	function processArrowKey(final) {
+		if (final === 'A') {
+			callbacks.onCursorUp?.()
+		} else if (final === 'B') {
+			callbacks.onCursorDown?.()
+		}
+	}
+
+	function parseCSI(str, start) {
+		// Parse CSI sequence starting after \x1b[
+		let j = start
+		// Collect parameter bytes (0x30-0x3F)
+		while (j < str.length && str.charCodeAt(j) >= 0x30 && str.charCodeAt(j) <= 0x3F) j++
+		// Collect intermediate bytes (0x20-0x2F)
+		while (j < str.length && str.charCodeAt(j) >= 0x20 && str.charCodeAt(j) <= 0x2F) j++
+		// Final byte
+		if (j < str.length) {
+			const final = str[j]
+			j++
+			return { final, end: j }
+		}
+		return { final: null, end: j }
+	}
+
+	function processBuffer() {
+		const str = pendingBuf
+		pendingBuf = ''
 		let i = 0
 
 		while (i < str.length) {
@@ -40,24 +68,31 @@ export function createKeyboardHandler(callbacks) {
 					clearDebounce()
 					searchMode = false
 					callbacks.onSearchConfirm?.()
+					callbacks.onEnter?.()
 					i++
 					continue
 				}
 				if (c === '\x1b') {
-					// Check for arrow keys in search mode — ignore them
-					if (i + 1 < str.length && (str[i + 1] === '[' || str[i + 1] === 'O')) {
-						let j = i + 2
-						while (j < str.length && j < i + 12) {
-							const ch = str[j]
-							if (/[A-Za-z]/.test(ch) || ch === '~') {
-								j++
-								break
-							}
-							j++
+					// Check if we have the full sequence
+					if (i + 1 < str.length && str[i + 1] === '[') {
+						const { final, end } = parseCSI(str, i + 2)
+						if (final) {
+							processArrowKey(final)
 						}
-						i = j
+						i = end
 						continue
 					}
+					if (i + 1 < str.length && str[i + 1] === 'O') {
+						i += 3
+						continue
+					}
+					if (i === str.length - 1) {
+						// Bare escape at end of buffer — it's a real Esc press
+						exitSearchMode()
+						i++
+						continue
+					}
+					// Bare escape mid-buffer — treat as Esc
 					exitSearchMode()
 					i++
 					continue
@@ -85,28 +120,14 @@ export function createKeyboardHandler(callbacks) {
 			// Normal mode — check for escape sequences (arrow keys)
 			if (c === '\x1b') {
 				if (i + 1 < str.length && str[i + 1] === '[') {
-					// CSI sequence: \x1b[ followed by params and a final letter
-					let j = i + 2
-					// Collect parameter bytes (0x30-0x3F)
-					while (j < str.length && str.charCodeAt(j) >= 0x30 && str.charCodeAt(j) <= 0x3F) j++
-					// Collect intermediate bytes (0x20-0x2F)
-					while (j < str.length && str.charCodeAt(j) >= 0x20 && str.charCodeAt(j) <= 0x2F) j++
-					// Final byte
-					if (j < str.length) {
-						const final = str[j]
-						j++
-						if (final === 'A') {
-							callbacks.onCursorUp?.()
-						} else if (final === 'B') {
-							callbacks.onCursorDown?.()
-						}
-						// Other CSI sequences silently ignored
+					const { final, end } = parseCSI(str, i + 2)
+					if (final) {
+						processArrowKey(final)
 					}
-					i = j
+					i = end
 					continue
 				}
 				if (i + 1 < str.length && str[i + 1] === 'O') {
-					// SS3 sequence — skip
 					i += 3
 					continue
 				}
@@ -139,9 +160,9 @@ export function createKeyboardHandler(callbacks) {
 				callbacks.onToggleAllPRs?.()
 			} else if (c === 's') {
 				callbacks.onToggleSilent?.()
-		} else if (c === 'r' || c === 'u') {
-			callbacks.onRefresh?.()
-		} else if (c === 'y') {
+			} else if (c === 'r' || c === 'u') {
+				callbacks.onRefresh?.()
+			} else if (c === 'y') {
 				callbacks.onClearHighlights?.()
 			} else if (c === 'q') {
 				callbacks.onQuit?.()
@@ -150,6 +171,27 @@ export function createKeyboardHandler(callbacks) {
 			}
 			i++
 		}
+	}
+
+	function handleData(chunk) {
+		pendingBuf += String(chunk)
+
+		// If the buffer ends with a bare \x1b, wait briefly for the rest
+		// of the escape sequence to arrive in the next chunk
+		if (escTimer) {
+			clearTimeout(escTimer)
+			escTimer = null
+		}
+
+		if (pendingBuf.endsWith('\x1b')) {
+			escTimer = setTimeout(() => {
+				escTimer = null
+				processBuffer()
+			}, ESC_TIMEOUT_MS)
+			return
+		}
+
+		processBuffer()
 	}
 
 	return {
@@ -172,6 +214,11 @@ export function createKeyboardHandler(callbacks) {
 			process.stdin.setRawMode(false)
 			process.stdin.pause()
 			clearDebounce()
+			if (escTimer) {
+				clearTimeout(escTimer)
+				escTimer = null
+			}
+			pendingBuf = ''
 			searchMode = false
 			searchBuffer = ''
 			stdinRaw = false

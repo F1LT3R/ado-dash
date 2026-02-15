@@ -284,6 +284,7 @@ const poller = createPoller({
 
 const keyboard = createKeyboardHandler({
 	onSearch(query) {
+		const changed = query !== searchQuery
 		if (!query) {
 			searchMatchIds = null
 			searchQuery = ''
@@ -291,8 +292,10 @@ const keyboard = createKeyboardHandler({
 			searchQuery = query
 			searchMatchIds = filterData(query, currentData)
 		}
-		// Reset cursor when search changes
-		cursor = { panel: cursor.panel, index: 0 }
+		// Only reset cursor when the query text actually changed
+		if (changed) {
+			cursor = { panel: cursor.panel, index: 0 }
+		}
 		render()
 	},
 
