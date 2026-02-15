@@ -9,7 +9,7 @@ function visLen(str) {
 }
 
 export function formatStatusBar(state, cols) {
-	const { lastSyncTime, nextSyncIn, silentMode, searchQuery, errorMessage, confirmPrompt } = state
+	const { lastSyncTime, nextSyncIn, silentMode, searchQuery, isSearchMode, errorMessage, confirmPrompt } = state
 
 	const leftParts = []
 	if (lastSyncTime != null) {
@@ -22,8 +22,8 @@ export function formatStatusBar(state, cols) {
 
 	const center = confirmPrompt
 		? chalk.yellowBright(confirmPrompt)
-		: searchQuery
-			? chalk.green(`Search: /${searchQuery}`)
+		: (isSearchMode || searchQuery)
+			? chalk.green(`Search: /${searchQuery || ''}`)
 			: ''
 
 	const rightParts = []

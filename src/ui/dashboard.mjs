@@ -139,6 +139,7 @@ export function createDashboard(renderer) {
 			nextSyncIn: data.nextSyncIn,
 			silentMode: data.silentMode,
 			searchQuery: data.searchQuery,
+			isSearchMode: data.isSearchMode,
 			errorMessage: data.errorMessage,
 			confirmPrompt: data.confirmPrompt
 		}, cols))

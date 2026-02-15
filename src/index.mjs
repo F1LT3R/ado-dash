@@ -125,7 +125,8 @@ function buildRenderData() {
 		lastSyncTime: formatTime(poller.getLastPollTime()),
 		nextSyncIn: getNextSyncIn(),
 		silentMode,
-		searchQuery: keyboard.isSearchMode() ? keyboard.getSearchQuery() : searchQuery || null,
+		searchQuery: keyboard.isSearchMode() ? (keyboard.getSearchQuery() || '') : searchQuery || null,
+		isSearchMode: keyboard.isSearchMode(),
 		errorMessage,
 		confirmPrompt: confirmPending ? 'Clear notifications? (y/N)' : null,
 		expandedPanel,
@@ -155,33 +156,42 @@ function getVisiblePanels() {
 }
 
 function moveCursorDown() {
+	const visible = getVisiblePanels()
+	if (visible.length === 0) return
+
 	const count = getItemCountForPanel(cursor.panel)
-	if (cursor.index < count - 1) {
+	if (count === 0 || !visible.includes(cursor.panel)) {
+		// Current panel is empty — jump to first visible panel
+		cursor = { panel: visible[0], index: 0 }
+	} else if (cursor.index < count - 1) {
 		cursor.index++
 	} else {
 		// Move to next panel's top
-		const visible = getVisiblePanels()
 		const idx = visible.indexOf(cursor.panel)
-		if (idx >= 0) {
-			const nextPanel = visible[(idx + 1) % visible.length]
-			cursor = { panel: nextPanel, index: 0 }
-		}
+		const nextPanel = visible[(idx + 1) % visible.length]
+		cursor = { panel: nextPanel, index: 0 }
 	}
 	render()
 }
 
 function moveCursorUp() {
-	if (cursor.index > 0) {
+	const visible = getVisiblePanels()
+	if (visible.length === 0) return
+
+	const count = getItemCountForPanel(cursor.panel)
+	if (count === 0 || !visible.includes(cursor.panel)) {
+		// Current panel is empty — jump to last visible panel's last item
+		const lastPanel = visible[visible.length - 1]
+		const lastCount = getItemCountForPanel(lastPanel)
+		cursor = { panel: lastPanel, index: Math.max(0, lastCount - 1) }
+	} else if (cursor.index > 0) {
 		cursor.index--
 	} else {
 		// Move to previous panel's bottom
-		const visible = getVisiblePanels()
 		const idx = visible.indexOf(cursor.panel)
-		if (idx >= 0) {
-			const prevPanel = visible[(idx - 1 + visible.length) % visible.length]
-			const prevCount = getItemCountForPanel(prevPanel)
-			cursor = { panel: prevPanel, index: Math.max(0, prevCount - 1) }
-		}
+		const prevPanel = visible[(idx - 1 + visible.length) % visible.length]
+		const prevCount = getItemCountForPanel(prevPanel)
+		cursor = { panel: prevPanel, index: Math.max(0, prevCount - 1) }
 	}
 	render()
 }
