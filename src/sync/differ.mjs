@@ -56,22 +56,30 @@ export function diffStates(oldState, newState, notificationKeys) {
 				}
 			}
 
-			const oldActive = oldPr.threadCounts?.active ?? 0
-			const newActive = pr.threadCounts?.active ?? 0
-			if (newActive !== oldActive) {
-				changedPrIds.add(id)
-				const cacheKey = `pr-comment:${id}:${newActive}`
-				if (!hasKey(cacheKey)) {
-					events.push({
-						type: 'pr-comment',
-						entityId: id,
-						message: `New comment on PR #${id}: ${pr.title ?? ''}`,
-						notifyType: 'status',
-						cacheKey,
-					})
+			// --- Thread counts (active, resolved, closed) ---
+			const oldThreads = oldPr.threadCounts ?? {}
+			const newThreads = pr.threadCounts ?? {}
+			for (const cat of ['active', 'resolved', 'closed']) {
+				const oldCount = oldThreads[cat] ?? 0
+				const newCount = newThreads[cat] ?? 0
+				if (newCount !== oldCount) {
+					changedPrIds.add(id)
+					const cacheKey = `pr-threads-${cat}:${id}:${newCount}`
+					if (!hasKey(cacheKey)) {
+						const delta = newCount - oldCount
+						const direction = delta > 0 ? `+${delta}` : `${delta}`
+						events.push({
+							type: 'pr-threads',
+							entityId: id,
+							message: `PR #${id} threads ${cat} ${direction} (now ${newCount}): ${pr.title ?? ''}`,
+							notifyType: 'status',
+							cacheKey,
+						})
+					}
 				}
 			}
 
+			// --- Title ---
 			const oldTitle = oldPr.title ?? ''
 			const newTitle = pr.title ?? ''
 			if (newTitle !== oldTitle) {
@@ -88,32 +96,113 @@ export function diffStates(oldState, newState, notificationKeys) {
 				}
 			}
 
+			// --- Draft status ---
+			const oldDraft = oldPr.isDraft ?? false
+			const newDraft = pr.isDraft ?? false
+			if (oldDraft !== newDraft) {
+				changedPrIds.add(id)
+				const label = newDraft ? 'marked as draft' : 'published'
+				const cacheKey = `pr-draft:${id}:${newDraft}`
+				if (!hasKey(cacheKey)) {
+					events.push({
+						type: 'pr-draft',
+						entityId: id,
+						message: `PR #${id} ${label}: ${pr.title ?? ''}`,
+						notifyType: 'status',
+						cacheKey,
+					})
+				}
+			}
+
+			// --- Reviewer votes (any change, not just approve/reject) ---
 			const oldVotes = new Map((oldPr.reviewers ?? []).map((r) => [r.name ?? r.id, r.vote ?? 0]))
 			const newVotes = new Map((pr.reviewers ?? []).map((r) => [r.name ?? r.id, r.vote ?? 0]))
-			for (const [name, vote] of newVotes) {
-				const prevVote = oldVotes.get(name) ?? 0
-				if (vote === 10 && prevVote !== 10) {
+			const oldReviewerNames = new Set(oldVotes.keys())
+			const newReviewerNames = new Set(newVotes.keys())
+
+			// New reviewers added
+			for (const name of newReviewerNames) {
+				if (!oldReviewerNames.has(name)) {
 					changedPrIds.add(id)
-					const cacheKey = `pr-approved:${id}:${name}`
+					const cacheKey = `pr-reviewer-added:${id}:${name}`
 					if (!hasKey(cacheKey)) {
 						events.push({
-							type: 'pr-approved',
+							type: 'pr-reviewer-added',
 							entityId: id,
-							message: `PR #${id} approved by ${name}`,
-							notifyType: 'done',
+							message: `${name} added as reviewer on PR #${id}`,
+							notifyType: 'status',
 							cacheKey,
 						})
 					}
 				}
-				if (vote === -10 && prevVote !== -10) {
+			}
+
+			// Reviewers removed
+			for (const name of oldReviewerNames) {
+				if (!newReviewerNames.has(name)) {
 					changedPrIds.add(id)
-					const cacheKey = `pr-rejected:${id}:${name}`
+					const cacheKey = `pr-reviewer-removed:${id}:${name}`
 					if (!hasKey(cacheKey)) {
 						events.push({
-							type: 'pr-rejected',
+							type: 'pr-reviewer-removed',
 							entityId: id,
-							message: `Changes requested on PR #${id} by ${name}`,
-							notifyType: 'review',
+							message: `${name} removed from PR #${id}`,
+							notifyType: 'status',
+							cacheKey,
+						})
+					}
+				}
+			}
+
+			// Vote changes
+			const voteLabels = { 10: 'approved', 5: 'approved with suggestions', 0: 'no vote', '-5': 'waiting for author', '-10': 'rejected' }
+			for (const [name, vote] of newVotes) {
+				const prevVote = oldVotes.get(name) ?? 0
+				if (vote !== prevVote && oldReviewerNames.has(name)) {
+					changedPrIds.add(id)
+					const label = voteLabels[vote] ?? `vote ${vote}`
+					const cacheKey = `pr-vote:${id}:${name}:${vote}`
+					if (!hasKey(cacheKey)) {
+						const notifyType = vote === 10 ? 'done' : vote === -10 ? 'review' : 'status'
+						events.push({
+							type: 'pr-vote',
+							entityId: id,
+							message: `${name} ${label} PR #${id}: ${pr.title ?? ''}`,
+							notifyType,
+							cacheKey,
+						})
+					}
+				}
+			}
+
+			// --- Linked work items ---
+			const oldWiIds = new Set((oldPr.workItemIds ?? []).map(String))
+			const newWiIds = new Set((pr.workItemIds ?? []).map(String))
+			for (const wiId of newWiIds) {
+				if (!oldWiIds.has(wiId)) {
+					changedPrIds.add(id)
+					const cacheKey = `pr-wi-linked:${id}:${wiId}`
+					if (!hasKey(cacheKey)) {
+						events.push({
+							type: 'pr-wi-linked',
+							entityId: id,
+							message: `Work item #${wiId} linked to PR #${id}`,
+							notifyType: 'status',
+							cacheKey,
+						})
+					}
+				}
+			}
+			for (const wiId of oldWiIds) {
+				if (!newWiIds.has(wiId)) {
+					changedPrIds.add(id)
+					const cacheKey = `pr-wi-unlinked:${id}:${wiId}`
+					if (!hasKey(cacheKey)) {
+						events.push({
+							type: 'pr-wi-unlinked',
+							entityId: id,
+							message: `Work item #${wiId} unlinked from PR #${id}`,
+							notifyType: 'status',
 							cacheKey,
 						})
 					}

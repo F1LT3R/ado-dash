@@ -152,7 +152,7 @@ export function createDashboard(renderer) {
 			lastData = data
 			const result = buildLines(data)
 			if (cascade) {
-				renderer.renderCascade(result.lines, 40)
+				renderer.renderCascade(result.lines, 5)
 			} else {
 				renderer.render(result.lines)
 			}
